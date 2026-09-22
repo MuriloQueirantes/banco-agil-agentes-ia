@@ -293,7 +293,28 @@ resultado final fixado na faixa 0–1000 (a penalidade por dívidas pode tornar 
 soma negativa). Ambos os desvios estão documentados no código e cobertos por
 teste.
 
-### 4.6 Testar agentes sem depender do LLM
+### 4.6 O que só a execução real revelou
+
+Dois problemas sobreviveram a 107 testes com LLM falso e só apareceram na
+primeira conversa de verdade — um bom argumento para os testes de integração
+existirem.
+
+**O modelo saiu do ar.** `gemini-2.0-flash` foi descontinuado durante o
+desenvolvimento e passou a responder 404. O padrão virou o alias
+`gemini-flash-latest`, para que um clone feito meses depois não quebre de novo;
+quem precisa de reprodutibilidade exata fixa `BANCO_AGIL_MODEL` no `.env`.
+
+O episódio acabou sendo a melhor demonstração do tratamento de erros: a
+conversa não caiu, o cliente recebeu *"tive uma instabilidade momentânea, pode
+repetir?"* e o stack trace foi para `logs/banco_agil.log`.
+
+**A resposta não era uma string.** No langchain-core 1.x, `AIMessage.content`
+pode vir como uma **lista de blocos tipados** — texto, raciocínio, assinaturas
+internas do provedor — em vez de `str`. A interface exibiria JSON cru ao
+cliente. [`src/mensagens.py`](src/mensagens.py) normaliza os dois formatos e
+descarta o que não é texto, com quatro testes de regressão.
+
+### 4.7 Testar agentes sem depender do LLM
 
 **Problema.** Testar um sistema de agentes chamando o modelo de verdade é
 lento, caro e não determinístico — o mesmo teste passa e falha sem nada ter
@@ -440,7 +461,7 @@ A lista também aparece na barra lateral da interface.
 ### Suíte automatizada
 
 ```bash
-pytest                       # 107 testes, ~1 segundo
+pytest                       # 111 testes, ~1 segundo
 pytest -v                    # com o nome de cada teste
 pytest --cov=src             # com cobertura (requer pytest-cov)
 ```
@@ -450,7 +471,7 @@ repositório — as fixtures trabalham sobre cópias temporárias das bases.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
-| `test_validators.py` | 49 | CPF (dígito verificador, zero à esquerda), datas, valores monetários, sinônimos da entrevista |
+| `test_validators.py` | 53 | CPF (dígito verificador, zero à esquerda), datas, valores monetários, sinônimos da entrevista, blocos de texto do LLM |
 | `test_scoring.py` | 16 | Fórmula ponderada, limites 0–1000, teto do componente de renda, explicabilidade |
 | `test_repositories.py` | 24 | Autenticação, política de limite, trilha de auditoria, escrita atômica |
 | `test_fluxo_atendimento.py` | 18 | Grafo ponta a ponta com LLM roteirizado: handoff, 3 tentativas, aprovação/rejeição, entrevista, câmbio, resiliência |
@@ -470,6 +491,8 @@ O mais direto ao ponto é `test_nao_revela_a_transferencia_ao_cliente`: ele
 troca de assunto no meio da conversa e verifica que a resposta não contém
 "transferir", "outro setor", "meu colega" e afins — enquanto a trilha confirma
 que o salto entre agentes de fato aconteceu.
+
+Última execução: **9 aprovados em 101 segundos** com `gemini-flash-latest`.
 
 ### Roteiro de teste manual
 
