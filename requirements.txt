@@ -1,0 +1,16 @@
+# Orquestração dos agentes
+langgraph==1.2.12
+langchain-core==1.6.4
+
+# Provedor de LLM
+langchain-google-genai==4.4.0
+
+# Interface
+streamlit==1.64.0
+
+# Utilitários
+python-dotenv==1.2.3
+requests==2.34.2
+
+# Testes
+pytest==9.1.1
