@@ -125,3 +125,50 @@ class TestCamposDaEntrevista:
     def test_rejeita_dependentes_negativos(self):
         with pytest.raises(EntradaInvalidaError):
             normalizar_dependentes(-1)
+
+
+class TestTextoDeMensagem:
+    """Regressão: o Gemini devolve blocos tipados, não uma string simples."""
+
+    def test_content_em_string(self):
+        from langchain_core.messages import AIMessage
+
+        from src.mensagens import texto_de
+
+        assert texto_de(AIMessage(content="  Olá!  ")) == "Olá!"
+
+    def test_content_em_blocos_concatena_apenas_o_texto(self):
+        from langchain_core.messages import AIMessage
+
+        from src.mensagens import texto_de
+
+        mensagem = AIMessage(
+            content=[
+                {"type": "text", "text": "Olá, Ana!", "extras": {"signature": "Ev0C"}},
+                {"type": "text", "text": " Seu limite é R$ 3.500,00."},
+            ]
+        )
+        texto = texto_de(mensagem)
+        assert texto == "Olá, Ana! Seu limite é R$ 3.500,00."
+        assert "signature" not in texto
+        assert "type" not in texto
+
+    def test_ignora_blocos_que_nao_sao_texto(self):
+        from langchain_core.messages import AIMessage
+
+        from src.mensagens import texto_de
+
+        mensagem = AIMessage(
+            content=[
+                {"type": "reasoning", "reasoning": "o cliente quer o limite"},
+                {"type": "text", "text": "Seu limite é R$ 3.500,00."},
+            ]
+        )
+        assert texto_de(mensagem) == "Seu limite é R$ 3.500,00."
+
+    def test_content_vazio(self):
+        from langchain_core.messages import AIMessage
+
+        from src.mensagens import texto_de
+
+        assert texto_de(AIMessage(content=[])) == ""

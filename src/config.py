@@ -31,7 +31,13 @@ LOG_FILE = LOG_DIR / "banco_agil.log"
 # LLM
 # --------------------------------------------------------------------------
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-LLM_MODEL = os.getenv("BANCO_AGIL_MODEL", "gemini-2.0-flash")
+
+# Alias, e não uma versão fixa, de propósito: o Google descontinua modelos com
+# alguma frequência (este projeto começou em gemini-2.0-flash, que saiu do ar
+# durante o desenvolvimento) e um repositório clonado meses depois deve
+# continuar funcionando. Para fixar uma versão exata e ter reprodutibilidade
+# total, defina BANCO_AGIL_MODEL no .env.
+LLM_MODEL = os.getenv("BANCO_AGIL_MODEL", "gemini-flash-latest")
 LLM_TEMPERATURE = float(os.getenv("BANCO_AGIL_TEMPERATURE", "0.2"))
 
 # --------------------------------------------------------------------------

@@ -19,6 +19,7 @@ from src.agents.definicoes import AGENTES
 from src.domain.models import SolicitacaoAumento
 from src.domain.validators import mascarar_cpf
 from src.graph import construir_grafo
+from src.mensagens import texto_de
 from src.repositories.solicitacoes import listar_por_cpf
 from src.logging_config import get_logger
 from src.state import estado_inicial
@@ -164,8 +165,10 @@ class SessaoAtendimento:
     @property
     def ultima_resposta(self) -> str:
         for mensagem in reversed(self._estado.get("messages", [])):
-            if isinstance(mensagem, AIMessage) and mensagem.content:
-                return str(mensagem.content).strip()
+            if isinstance(mensagem, AIMessage):
+                texto = texto_de(mensagem)
+                if texto:
+                    return texto
         return RESPOSTA_VAZIA
 
     @property
