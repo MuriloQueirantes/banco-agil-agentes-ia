@@ -158,14 +158,29 @@ html, body, [class*="st-"], .stMarkdown, p, div, span, li {
   border-radius: 8px;
 }
 [data-testid="stChatInput"] textarea { font-family: var(--corpo); }
-[data-testid="stBottomBlockContainer"] { background: var(--tinta); }
+[data-testid="stBottomBlockContainer"] {
+  background: var(--tinta);
+  max-width: 47rem;      /* mesma medida do container das mensagens */
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
 
 /* ---------------------------------------------------------- bastidores -- */
 [data-testid="stSidebar"] {
   background: #080C12;
   border-right: 1px solid var(--linha);
 }
-[data-testid="stSidebar"] * { font-family: var(--mono); }
+/* A monoespaçada vale só para os nossos elementos. Um seletor universal aqui
+   também atingiria os ícones do Streamlit, que são ligaduras da fonte Material
+   Symbols — sem a fonte certa, o botão de recolher a barra exibe o texto cru
+   "keyboard_double_arrow_left". */
+[data-testid="stSidebar"] .bast__titulo,
+[data-testid="stSidebar"] .campo, [data-testid="stSidebar"] .campo *,
+[data-testid="stSidebar"] .trilha, [data-testid="stSidebar"] .trilha *,
+[data-testid="stSidebar"] .ficha,  [data-testid="stSidebar"] .ficha *,
+[data-testid="stSidebar"] .vazio,
+[data-testid="stSidebar"] .stButton button { font-family: var(--mono); }
 
 .bast__titulo {
   font-size: .63rem;
@@ -192,7 +207,11 @@ html, body, [class*="st-"], .stMarkdown, p, div, span, li {
 .campo__valor--alerta { color: var(--alerta); }
 
 /* Trilha: régua vertical com um nó por passo do turno. */
-.trilha { position: relative; padding-left: 1.05rem; margin-top: .2rem; }
+.trilha {
+  position: relative;
+  padding-left: 1.05rem;
+  margin: .2rem 0 .3rem;
+}
 .trilha::before {
   content: '';
   position: absolute;

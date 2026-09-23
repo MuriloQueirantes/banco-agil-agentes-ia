@@ -175,6 +175,18 @@ para `aprovado` ou `rejeitado`. Se a análise falhar no meio, o pedido continua
 no arquivo como pendente — uma trilha de auditoria correta, não um registro
 perdido.
 
+**Aprovar efetiva o limite.** O enunciado descreve o pedido e seu status, mas
+não diz explicitamente o que acontece com o limite do cliente depois da
+aprovação. Optamos por fechar o ciclo: um pedido aprovado grava o novo
+`limite_atual` em `clientes.csv`, de modo que a consulta seguinte já reflita a
+decisão — caso contrário o cliente ouviria "aprovado" e continuaria vendo o
+limite antigo.
+
+A efetivação é tratada como um passo que pode falhar sozinho. Se a gravação do
+limite não funcionar, o pedido **permanece aprovado** na auditoria e o cliente
+é avisado de que a atualização aparecerá em instantes. Reverter para "não
+aprovado" seria dar uma informação errada sobre uma decisão que já foi tomada.
+
 ---
 
 ## 3. Funcionalidades
@@ -194,6 +206,7 @@ perdido.
 - [x] Registro do pedido em `solicitacoes_aumento_limite.csv` com as cinco colunas exigidas
 - [x] Timestamp em ISO 8601
 - [x] Avaliação contra `score_limite.csv` → `aprovado` / `rejeitado`
+- [x] Pedido aprovado **efetiva** o novo limite em `clientes.csv`
 - [x] Em caso de rejeição, oferece a entrevista e **aguarda** a resposta do cliente
 - [x] Se o cliente recusar, encaminha para outro assunto ou encerra
 - [x] Consulta ao histórico de pedidos anteriores
@@ -314,7 +327,22 @@ internas do provedor — em vez de `str`. A interface exibiria JSON cru ao
 cliente. [`src/mensagens.py`](src/mensagens.py) normaliza os dois formatos e
 descarta o que não é texto, com quatro testes de regressão.
 
-### 4.7 Testar agentes sem depender do LLM
+### 4.7 Os testes dependiam da base que o app modifica
+
+**Problema.** As fixtures copiavam `data/clientes.csv` para um diretório
+temporário. Parece seguro — a suíte nunca escreve no repositório. Mas
+`clientes.csv` é uma base **viva**: a entrevista grava o novo score nela. Depois
+de uma conversa real pela interface, o Roberto passou de score 260 para 620, e
+sete testes que dependiam do valor 260 quebraram.
+
+O sintoma é traiçoeiro porque a suíte passa num clone recém-feito e falha
+depois que alguém abre o Streamlit — exatamente o que um avaliador faria.
+
+**Solução.** As bases de teste agora são **escritas no `conftest.py`**, com
+valores fixos, em vez de copiadas de `data/`. A suíte ficou determinística e
+independente do estado da demonstração.
+
+### 4.8 Testar agentes sem depender do LLM
 
 **Problema.** Testar um sistema de agentes chamando o modelo de verdade é
 lento, caro e não determinístico — o mesmo teste passa e falha sem nada ter
@@ -323,7 +351,7 @@ mudado.
 **Solução.** Separar as duas responsabilidades. O que é do **sistema**
 (roteamento, handoff, contagem de tentativas, escrita em CSV, encerramento) é
 testado com um `LLMRoteirizado` — um modelo falso que devolve uma sequência
-fixa de respostas. São 18 testes de fluxo que rodam em ~1 segundo, sem rede.
+fixa de respostas. São 21 testes de fluxo que rodam em ~1 segundo, sem rede.
 O que é do **modelo** (escolher a ferramenta certa, redigir bem) é verificado
 por nove testes de integração marcados com `@pytest.mark.integracao`, que rodam
 contra o Gemini real sob demanda, e pelo roteiro manual da seção 7.
@@ -439,6 +467,18 @@ python main.py                # atendimento simples
 python main.py --bastidores   # mostra o percurso interno a cada turno
 ```
 
+### Sobre os dados de demonstração
+
+`data/` é uma base viva: a entrevista grava o novo score em `clientes.csv` e
+cada pedido acrescenta uma linha em `solicitacoes_aumento_limite.csv`. Isso é o
+sistema funcionando. Para voltar ao estado inicial depois de explorar:
+
+```bash
+git checkout data/
+```
+
+A suíte de testes não é afetada — ela usa bases próprias.
+
 ### Clientes disponíveis para teste
 
 | Nome | CPF | Nascimento | Limite | Score | Teto |
@@ -461,7 +501,7 @@ A lista também aparece na barra lateral da interface.
 ### Suíte automatizada
 
 ```bash
-pytest                       # 111 testes, ~1 segundo
+pytest                       # 118 testes, ~1 segundo
 pytest -v                    # com o nome de cada teste
 pytest --cov=src             # com cobertura (requer pytest-cov)
 ```
@@ -473,8 +513,8 @@ repositório — as fixtures trabalham sobre cópias temporárias das bases.
 |---|---|---|
 | `test_validators.py` | 53 | CPF (dígito verificador, zero à esquerda), datas, valores monetários, sinônimos da entrevista, blocos de texto do LLM |
 | `test_scoring.py` | 16 | Fórmula ponderada, limites 0–1000, teto do componente de renda, explicabilidade |
-| `test_repositories.py` | 24 | Autenticação, política de limite, trilha de auditoria, escrita atômica |
-| `test_fluxo_atendimento.py` | 18 | Grafo ponta a ponta com LLM roteirizado: handoff, 3 tentativas, aprovação/rejeição, entrevista, câmbio, resiliência |
+| `test_repositories.py` | 28 | Autenticação, política de limite, trilha de auditoria, escrita atômica |
+| `test_fluxo_atendimento.py` | 21 | Grafo ponta a ponta com LLM roteirizado: handoff, 3 tentativas, aprovação/rejeição, entrevista, câmbio, resiliência |
 
 ### Testes de integração com o Gemini
 

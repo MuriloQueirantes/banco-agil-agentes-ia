@@ -167,11 +167,29 @@ def solicitar_aumento_limite(
         )
 
     if aprovado:
-        logger.info("Pedido aprovado: %s -> %s", cliente.limite_atual, valor)
+        # O pedido aprovado é efetivado no cadastro. Se a gravação do limite
+        # falhar, o pedido continua valendo como 'aprovado' na auditoria e o
+        # cliente é avisado de que a atualização aparecerá em instantes — o
+        # inverso (dizer que não foi aprovado) seria informação errada.
+        try:
+            cliente = repo_clientes.atualizar_limite(cliente.cpf, valor)
+            efetivado = True
+        except (ErroDeDadosError, ClienteNaoEncontradoError):
+            logger.exception("Pedido aprovado mas o limite não pôde ser efetivado")
+            efetivado = False
+
+        logger.info("Pedido aprovado: %s -> %s", pedido.limite_atual, valor)
+        detalhe = (
+            f"O limite já está ativo em {_brl(valor)}."
+            if efetivado
+            else "A atualização do limite está sendo processada e aparecerá em "
+                 "instantes; avise o cliente disso."
+        )
         return _resposta(
             f"PEDIDO APROVADO. Protocolo {pedido.data_hora_solicitacao}. "
-            f"Novo limite solicitado: {_brl(valor)} (teto do score {cliente.score}: "
-            f"{_brl(teto)}). Dê a boa notícia ao cliente e pergunte se ele precisa "
+            f"Limite anterior: {_brl(pedido.limite_atual)}. Novo limite: "
+            f"{_brl(valor)} (teto do score {cliente.score}: {_brl(teto)}). "
+            f"{detalhe} Dê a boa notícia ao cliente e pergunte se ele precisa "
             "de mais alguma coisa.",
             tool_call_id,
             status_ultima_solicitacao=STATUS_APROVADO,

@@ -82,6 +82,33 @@ class TestAtualizacaoDeScore:
             repo_clientes.atualizar_score("11144477735", 500)
 
 
+class TestEfetivacaoDeLimite:
+    def test_persiste_o_novo_limite(self, bases, cliente_score_alto):
+        atualizado = repo_clientes.atualizar_limite(cliente_score_alto.cpf, 25000.0)
+        assert atualizado.limite_atual == 25000.0
+        assert repo_clientes.buscar_por_cpf(cliente_score_alto.cpf).limite_atual == 25000.0
+
+    def test_nao_altera_o_score_nem_os_outros_clientes(self, bases, cliente_score_alto):
+        antes = {c.cpf: c for c in repo_clientes.listar_clientes()}
+        repo_clientes.atualizar_limite(cliente_score_alto.cpf, 25000.0)
+        depois = {c.cpf: c for c in repo_clientes.listar_clientes()}
+
+        assert depois[cliente_score_alto.cpf].score == antes[cliente_score_alto.cpf].score
+        for cpf, cliente in antes.items():
+            if cpf != cliente_score_alto.cpf:
+                assert depois[cpf] == cliente
+
+    def test_grava_com_duas_casas_decimais(self, bases, cliente_score_alto):
+        repo_clientes.atualizar_limite(cliente_score_alto.cpf, 12345)
+        linhas = ler_csv(bases / "clientes.csv")
+        linha = next(l for l in linhas if l["cpf"] == cliente_score_alto.cpf)
+        assert linha["limite_atual"] == "12345.00"
+
+    def test_cpf_inexistente_levanta_erro(self, bases):
+        with pytest.raises(ClienteNaoEncontradoError):
+            repo_clientes.atualizar_limite("11144477735", 1000.0)
+
+
 class TestPoliticaDeLimite:
     @pytest.mark.parametrize(
         "score,teto",

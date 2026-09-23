@@ -220,6 +220,60 @@ class TestFluxoDeCredito:
         assert linhas[0]["novo_limite_solicitado"] == "10000.00"
         assert linhas[0]["status_pedido"] == "aprovado"
 
+    def test_aprovacao_efetiva_o_limite_no_cadastro(self, executar, bases):
+        """Aprovar não é só carimbar o pedido: o limite passa a valer."""
+        from src.repositories import clientes as repo_clientes
+
+        assert repo_clientes.buscar_por_cpf(CPF_ANA).limite_atual == 3500.0
+
+        executar(
+            [
+                chamar("solicitar_aumento_limite", novo_limite=10000),
+                falar("Aprovado! Seu novo limite já está ativo."),
+            ],
+            estado=self._autenticado(CPF_ANA, "Ana Beatriz Ramos"),
+        )
+
+        assert repo_clientes.buscar_por_cpf(CPF_ANA).limite_atual == 10000.0
+
+    def test_rejeicao_nao_altera_o_limite(self, executar, bases):
+        from src.repositories import clientes as repo_clientes
+
+        executar(
+            [
+                chamar("solicitar_aumento_limite", novo_limite=5000),
+                falar("Não consegui aprovar agora."),
+            ],
+            estado=self._autenticado(CPF_ROBERTO, "Roberto Nunes Alves"),
+        )
+
+        assert repo_clientes.buscar_por_cpf(CPF_ROBERTO).limite_atual == 800.0
+
+    def test_falha_ao_efetivar_mantem_o_pedido_aprovado(
+        self, executar, bases, monkeypatch
+    ):
+        """Se a gravação do limite falhar, o pedido aprovado não é revertido."""
+        from src.tools import credito_tools
+        from src.domain.exceptions import ErroDeDadosError
+
+        def falha(*_, **__):
+            raise ErroDeDadosError("disco indisponível")
+
+        monkeypatch.setattr(credito_tools.repo_clientes, "atualizar_limite", falha)
+
+        estado, _ = executar(
+            [
+                chamar("solicitar_aumento_limite", novo_limite=10000),
+                falar("Seu aumento foi aprovado e será atualizado em instantes."),
+            ],
+            estado=self._autenticado(CPF_ANA, "Ana Beatriz Ramos"),
+        )
+
+        assert estado["status_ultima_solicitacao"] == "aprovado"
+        assert estado["encerrado"] is False
+        linhas = ler_csv(bases / "solicitacoes_aumento_limite.csv")
+        assert linhas[0]["status_pedido"] == "aprovado"
+
     def test_pedido_acima_do_teto_e_rejeitado_e_fica_registrado(self, executar, bases):
         estado, _ = executar(
             [

@@ -73,8 +73,8 @@ def autenticar(cpf: str, data_nascimento: date) -> Cliente:
     return cliente
 
 
-def atualizar_score(cpf: str, novo_score: int) -> Cliente:
-    """Persiste o novo score preservando as demais colunas do arquivo."""
+def _atualizar_campos(cpf: str, campos: dict[str, str], acao: str) -> Cliente:
+    """Altera colunas de um cliente preservando todo o resto do arquivo."""
     alvo = somente_digitos(cpf).zfill(11)
     linhas = ler_csv(CLIENTES_CSV)
     exigir_colunas(linhas, _OBRIGATORIAS, CLIENTES_CSV.name)
@@ -82,22 +82,47 @@ def atualizar_score(cpf: str, novo_score: int) -> Cliente:
     encontrado = False
     for linha in linhas:
         if somente_digitos(linha["cpf"]).zfill(11) == alvo:
-            linha["score"] = str(int(novo_score))
+            linha.update(campos)
             encontrado = True
             break
 
     if not encontrado:
         raise ClienteNaoEncontradoError(
-            "Não localizei o cadastro para atualizar o score."
+            f"Não localizei o cadastro para {acao}."
         )
 
     colunas = list(linhas[0].keys()) if linhas else COLUNAS
     escrever_csv(CLIENTES_CSV, colunas, linhas)
-    logger.info(
-        "Score do CPF %s atualizado para %s", mascarar_cpf(alvo), novo_score
-    )
 
     atualizado = buscar_por_cpf(alvo)
     if atualizado is None:  # pragma: no cover - inconsistência improvável
         raise ErroDeDadosError("Falha ao reler o cadastro após a atualização.")
     return atualizado
+
+
+def atualizar_score(cpf: str, novo_score: int) -> Cliente:
+    """Persiste o novo score calculado pela entrevista financeira."""
+    cliente = _atualizar_campos(
+        cpf, {"score": str(int(novo_score))}, "atualizar o score"
+    )
+    logger.info(
+        "Score do CPF %s atualizado para %s", mascarar_cpf(cliente.cpf), novo_score
+    )
+    return cliente
+
+
+def atualizar_limite(cpf: str, novo_limite: float) -> Cliente:
+    """Efetiva um novo limite de crédito aprovado.
+
+    Chamado quando uma solicitação de aumento passa na política de score: o
+    pedido fica registrado como `aprovado` na trilha de auditoria **e** o limite
+    do cliente é de fato alterado, para que a próxima consulta reflita a
+    decisão.
+    """
+    cliente = _atualizar_campos(
+        cpf, {"limite_atual": f"{float(novo_limite):.2f}"}, "atualizar o limite"
+    )
+    logger.info(
+        "Limite do CPF %s efetivado em %.2f", mascarar_cpf(cliente.cpf), novo_limite
+    )
+    return cliente
