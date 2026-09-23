@@ -151,7 +151,29 @@ A cada turno, o estado relevante é **injetado no prompt do sistema** pela funç
 `_contexto_da_sessao` — o modelo sempre sabe se o cliente está autenticado e
 quantas tentativas restam, sem precisar deduzir do histórico.
 
-### 2.5 Fluxo dos dados
+### 2.5 Sobre as bases de dados
+
+O enunciado referencia `clientes.csv` e `score_limite.csv`, mas esses arquivos
+não acompanhavam o desafio — **as três bases foram criadas neste projeto**:
+
+* **`clientes.csv`** — oito clientes fictícios cobrindo toda a escala de score
+  (de 180 a 880), para que cada faixa da política de limite tenha pelo menos um
+  caso testável. Os CPFs são gerados com dígito verificador válido, já que a
+  autenticação valida o dígito; um deles começa com zero, de propósito, para
+  exercitar o tratamento descrito em 4.3.
+* **`score_limite.csv`** — cinco faixas de score com o teto de limite
+  correspondente. É a política de crédito do banco, editável sem tocar no
+  código.
+* **`solicitacoes_aumento_limite.csv`** — criado vazio, apenas com o cabeçalho.
+  É preenchido pelo sistema, com as colunas exatas exigidas pelo enunciado.
+
+**Uma nota sobre o vocabulário de status.** O enunciado especifica os valores
+`'pendente'`, `'aprovado'` e `'rejeitado'` para a coluna `status_pedido`, mas
+mais adiante, ao descrever o que fazer depois de uma recusa, usa a palavra
+`'reprovado'`. Adotamos `'rejeitado'` em todo o sistema, por ser o termo da
+especificação das colunas — que é o contrato do arquivo.
+
+### 2.6 Fluxo dos dados
 
 ```
 data/clientes.csv                    leitura: autenticação, limite, score
