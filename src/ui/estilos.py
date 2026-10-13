@@ -50,7 +50,38 @@ html, body, [class*="st-"], .stMarkdown, p, div, span, li {
   padding-bottom: 7rem;
 }
 
-#MainMenu, footer, [data-testid="stHeader"] { visibility: hidden; height: 0; }
+/* O botão que REABRE a barra lateral é filho de `stToolbar`. Esconder o
+   toolbar inteiro zerava o botão (28px viravam 0) e deixava o painel de
+   bastidores inacessível até recarregar a página — e o Streamlit lembra o
+   estado recolhido entre recargas, então nem o refresh resolvia.
+   Escondemos apenas as ações do toolbar e preservamos o botão. */
+[data-testid="stHeader"] {
+  background: transparent;
+  pointer-events: none;
+}
+[data-testid="stToolbar"] {
+  background: transparent;
+  pointer-events: none;
+}
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+#MainMenu,
+footer { display: none; }
+
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"] { pointer-events: auto; }
+[data-testid="stExpandSidebarButton"] { color: var(--ambar); }
+
+/* Os ícones do Streamlit são ligaduras de uma fonte própria. A regra global de
+   tipografia alcança os spans que os contêm, e sem esta exceção o botão exibe
+   o nome do ícone como texto ("keyboard_double_arrow_right"). */
+[data-testid="stIconMaterial"],
+[data-testid="stExpandSidebarButton"] span,
+[data-testid="stSidebarCollapseButton"] span {
+  font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+}
 
 /* -------------------------------------------------------------- marca -- */
 .marca {
