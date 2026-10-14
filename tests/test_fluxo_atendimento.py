@@ -569,3 +569,54 @@ class TestTrilhaDosBastidores:
             ("ferramenta", "transferir_para_credito"),
         ]
         assert sessao.bastidores().agente_atual == "triagem"
+
+
+class TestJanelaDeContexto:
+    """Regressão: conversas longas quebravam com 400 no Gemini.
+
+    A API recusa o histórico quando a sequência enviada não começa num turno
+    do usuário. Cortar pelo tamanho podia deixar como primeira mensagem uma
+    ToolMessage órfã ou uma AIMessage com tool_calls — e o atendimento morria
+    exatamente no caminho mais longo: entrevista completa seguida de outro
+    assunto.
+    """
+
+    def _historico(self, turnos: int, ferramentas_extras: bool = False):
+        from langchain_core.messages import ToolMessage
+
+        mensagens = []
+        for i in range(turnos):
+            mensagens.append(HumanMessage(content=f"pergunta {i}"))
+            mensagens.append(chamar("consultar_limite_credito"))
+            mensagens.append(ToolMessage(content="ok", tool_call_id=f"c{i}"))
+            if ferramentas_extras and i % 3 == 0:
+                mensagens.append(chamar("transferir_para_cambio"))
+                mensagens.append(ToolMessage(content="ok", tool_call_id=f"d{i}"))
+            mensagens.append(falar(f"resposta {i}"))
+        return mensagens
+
+    def test_janela_curta_passa_inteira(self):
+        from src.graph import _janela
+
+        mensagens = self._historico(3)
+        assert _janela(mensagens) == mensagens
+
+    @pytest.mark.parametrize("turnos", range(10, 40))
+    @pytest.mark.parametrize("extras", [False, True])
+    def test_janela_sempre_comeca_num_turno_do_cliente(self, turnos, extras):
+        from src.graph import _janela
+
+        mensagens = self._historico(turnos, extras)
+        primeira = _janela(mensagens)[0]
+        assert isinstance(primeira, HumanMessage), (
+            f"com {len(mensagens)} mensagens a janela começou em "
+            f"{type(primeira).__name__} — o Gemini recusaria com 400"
+        )
+
+    def test_janela_preserva_as_mensagens_mais_recentes(self):
+        from src.graph import _janela
+
+        mensagens = self._historico(20)
+        janela = _janela(mensagens)
+        assert janela[-1] is mensagens[-1]
+        assert len(janela) <= len(mensagens)

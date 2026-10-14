@@ -39,7 +39,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from langchain_core.messages import AIMessage, AnyMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+)
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -101,16 +106,28 @@ def _contexto_da_sessao(state: EstadoAtendimento) -> str:
 
 
 def _janela(mensagens: list[AnyMessage]) -> list[AnyMessage]:
-    """Últimas N mensagens, sem cortar um par tool_call / ToolMessage ao meio.
+    """Últimas N mensagens, cortadas numa fronteira que o Gemini aceita.
 
-    Uma `ToolMessage` órfã (sem a `AIMessage` que a originou) é rejeitada pela
-    API do Gemini, então recuamos o corte até a fronteira segura mais próxima.
+    A API recusa o histórico com 400 INVALID_ARGUMENT — *"function call turn
+    must come immediately after a user turn or after a function response
+    turn"* — sempre que a sequência enviada não começa num turno do usuário.
+    Duas formas de violar isso ao cortar pelo tamanho:
+
+    * começar numa `ToolMessage` órfã, sem a `AIMessage` que a originou;
+    * começar numa `AIMessage` com `tool_calls`, sem o turno do cliente antes.
+
+    Por isso o corte recua até a `HumanMessage` mais próxima, que é a única
+    fronteira sempre válida. A janela pode ficar maior que o alvo — preferível
+    a uma conversa que morre no meio do atendimento.
+
+    O sintoma aparecia só em conversas longas (entrevista completa seguida de
+    outro assunto), que é justamente o caminho mais completo da demonstração.
     """
     if len(mensagens) <= JANELA_DE_MENSAGENS:
         return mensagens
 
     inicio = len(mensagens) - JANELA_DE_MENSAGENS
-    while inicio > 0 and isinstance(mensagens[inicio], ToolMessage):
+    while inicio > 0 and not isinstance(mensagens[inicio], HumanMessage):
         inicio -= 1
     return mensagens[inicio:]
 
